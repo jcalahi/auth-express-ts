@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 
 const router = Router();
 /**
@@ -7,6 +7,15 @@ const router = Router();
  */
 interface RequestWithBody extends Request {
   body: { [key: string]: string | undefined };
+}
+
+function requireAuth(req: Request, res: Response, next: NextFunction): void {
+  if (req.session && req.session.loggedIn) {
+    next();
+    return;
+  } else {
+    res.status(403).send('Not permitted');
+  }
 }
 
 router.get('/login', (req: Request, res: Response): void => {
@@ -28,12 +37,39 @@ router.get('/login', (req: Request, res: Response): void => {
 router.post('/login', (req: RequestWithBody, res: Response): void => {
   const { email, password } = req.body;
 
-  if (email) {
-    res.send(email.toUpperCase());
+  if (email && password && email === 'email' && password === 'password') {
+    req.session = { loggedIn: true };
+    res.redirect('/');
   } else {
-    // status code 422
-    res.send('You must provide an email');
+    res.send('Invalid email or password');
   }
+});
+
+router.get('/', (req: Request, res: Response): void => {
+  if (req.session && req.session.loggedIn) {
+    res.send(`
+      <div>
+        <div>You are logged in!</div>
+        <a href="/logout">Logout</a>
+      </div>
+    `);
+  } else {
+    res.send(`
+      <div>
+        <div>You are NOT logged in!</div>
+        <a href="/login">Login</a>
+      </div>
+    `);
+  }
+});
+
+router.get('/logout', (req: Request, res: Response) => {
+  req.session = undefined;
+  res.redirect('/');
+});
+
+router.get('/protected', requireAuth, (req: Request, res: Response): void => {
+  res.send('Welcome to logged in route, protected user.');
 });
 
 export { router };
